@@ -189,6 +189,28 @@ void backward_pass_mlp(int *flattened_input, double pred, int true_label, double
     *bias -= (lr * output_gradient);
 }
 
+// Gera um heatmap 2D (Filtros no eixo Y, Posicao da cadeia no eixo X)
+void generate_2d_heatmap(const char *filename, int *flattened_vector, int num_filters, int feature_size, int filter_size) {
+    FILE *file = fopen(filename, "w");
+    if (!file) return;
+
+    fprintf(file, "P3\n%d %d\n255\n", feature_size, num_filters);
+
+    for (int f = 0; f < num_filters; f++) {
+        for (int w = 0; w < feature_size; w++) {
+            int score = flattened_vector[f * feature_size + w];
+            float rate = (float)score / filter_size; 
+
+            int r = (int)((1.0 - rate) * 255);
+            int g = (int)(rate * 255);
+            
+            fprintf(file, "%d %d 0 ", r, g);
+        }
+        fprintf(file, "\n");
+    }
+    fclose(file);
+}
+
 // ============================================================================
 // MAIN EXECUTION
 // ============================================================================
@@ -243,7 +265,13 @@ int main() {
         // Treino
         double pred = forward_pass_mlp(flattened_vector, mlp_weights, mlp_bias, mlp_input_size);
         double abs_error = fabs(pred - (double)true_label);
-        
+        if (step % 10 == 0) {
+            char filename[50];
+            // Usamos os filtros K=3 como exemplo para a imagem
+            sprintf(filename, "heatmap_k3_step_%d.ppm", step);
+            generate_2d_heatmap(filename, flattened_vector, total_k3, (SEQ_LENGTH - 3 + 1), 3);
+        }
+
         if (step == 1 || step % 10 == 0) {
             printf("Step %03d | True Label: %d | Pred: %.4f | Abs Error: %.4f\n", 
                    step, true_label, pred, abs_error);
